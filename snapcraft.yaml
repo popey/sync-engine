@@ -1,0 +1,33 @@
+name: sync-engine
+version: master
+summary: IMAP/SMTP sync system with modern APIs
+description: |
+  The Nylas Sync Engine provides a RESTful API on top of a powerful email sync
+  platform, making it easy to build apps on top of email.
+
+grade: devel
+confinement: strict
+
+apps:
+  inbox-auth:
+    command: env SYNC_ENGINE_CFG_PATH="$SNAP_USER_COMMON/secrets.yml:$SNAP_USER_COMMON/config.json" inbox-auth
+    plugs: [network]
+  inbox-start:
+    command: inbox-start
+    plugs: [network, network-bind]
+  create-db:
+    command: env SYNC_ENGINE_CFG_PATH="$SNAP_USER_COMMON/secrets.yml:$SNAP_USER_COMMON/config.json" create-db
+    plugs: [network]
+  mysql:
+    command: mysqld_safe --ledir="$SNAP/usr/sbin" --datadir="$SNAP_USER_COMMON/mysql" --socket="$SNAP_USER_DATA/mysql/mysql.sock"
+    plugs: [home, network, network-bind, system-observe]
+
+parts:
+  sync-engine:
+    source: .
+    plugin: python
+    python-version: python2
+    requirements: requirements.txt
+    stage-packages:
+      - coreutils
+      - mysql-server
