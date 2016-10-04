@@ -19,8 +19,11 @@ apps:
     command: env SYNC_ENGINE_CFG_PATH="$SNAP_USER_COMMON/secrets.yml:$SNAP_USER_COMMON/config.json" create-db
     plugs: [network]
   mysql:
-    command: mysqld_safe --ledir="$SNAP/usr/sbin" --datadir="$SNAP_USER_COMMON/mysql" --socket="$SNAP_USER_DATA/mysql/mysql.sock"
-    plugs: [home, network, network-bind, system-observe]
+    command: start_mysql
+    stop-command: support-files/mysql.server stop
+    daemon: simple
+    restart-condition: always
+    plugs: [network, network-bind]
 
 parts:
   sync-engine:
@@ -30,4 +33,77 @@ parts:
     requirements: requirements.txt
     stage-packages:
       - coreutils
-      - mysql-server
+
+  boost:
+    plugin: copy
+    source: http://sourceforge.net/projects/boost/files/boost/1.59.0/boost_1_59_0.tar.gz
+    files:
+      '*': boost/
+    snap:
+      - -*
+
+  mysql:
+    plugin: cmake
+    source: https://github.com/kyrofa/mysql-server.git
+    source-type: git
+    source-branch: feature/support_no_setpriority
+    after: [boost]
+    configflags:
+      - -DWITH_BOOST=$SNAPCRAFT_STAGE/boost
+      - -DWITH_INNODB_PAGE_CLEANER_PRIORITY=OFF
+      - -DCMAKE_INSTALL_PREFIX=/
+      - -DBUILD_CONFIG=mysql_release
+      - -DWITH_UNIT_TESTS=OFF
+      - -DWITH_EMBEDDED_SERVER=OFF
+      - -DWITH_EMBEDDED_SHARED_LIBRARY=OFF
+      - -DWITH_ARCHIVE_STORAGE_ENGINE=OFF
+      - -DWITH_BLACKHOLE_STORAGE_ENGINE=OFF
+      - -DWITH_FEDERATED_STORAGE_ENGINE=OFF
+      - -DWITH_PARTITION_STORAGE_ENGINE=OFF
+      - -DINSTALL_MYSQLTESTDIR=
+    build-packages:
+      - wget
+      - g++
+      - cmake
+      - bison
+      - libncurses5-dev
+      - libaio-dev
+    stage:
+      # Remove scripts that we'll be replacing with our own
+      - -support-files/mysql.server
+    snap:
+      # Remove scripts that we'll be replacing with our own
+      - -support-files/mysql.server
+
+      # Remove unused binaries that waste space
+      - -bin/innochecksum
+      - -bin/lz4_decompress
+      - -bin/myisam*
+      - -bin/mysqladmin
+      - -bin/mysqlbinlog
+      - -bin/mysql_client_test
+      - -bin/mysql_config*
+      - -bin/mysqld_multi
+      - -bin/mysqldump*
+      - -bin/mysqlimport
+      - -bin/mysql_install_db
+      - -bin/mysql_plugin
+      - -bin/mysqlpump
+      - -bin/mysql_secure_installation
+      - -bin/mysqlshow
+      - -bin/mysqlslap
+      - -bin/mysql_ssl_rsa_setup
+      - -bin/mysqltest
+      - -bin/mysql_tzinfo_to_sql
+      - -bin/perror
+      - -bin/replace
+      - -bin/resolveip
+      - -bin/resolve_stack_dump
+      - -bin/zlib_decompress
+
+  mysql-customizations:
+    plugin: copy
+    files:
+      src/mysql/start_mysql: bin/
+      src/mysql/my.cnf: my.cnf
+      src/mysql/mysql.server: support-files/
